@@ -8,12 +8,12 @@
 <style>
   :root {
     --bg: #f5f5f5; --fg: #1a1a1a; --muted: #6b6b6b;
-    --card: #ffffff; --line: #e0e0e0; --accent: #1a1a1a;
+    --card: #ffffff; --line: #e0e0e0; --accent: #1a1a1a; --track: #e6e6e6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #16181a; --fg: #ececec; --muted: #9aa0a6;
-      --card: #1f2225; --line: #2e3237; --accent: #ececec;
+      --card: #1f2225; --line: #2e3237; --accent: #ececec; --track: #33383d;
     }
   }
   * { box-sizing: border-box; }
@@ -27,6 +27,8 @@
   /* ---- Einzelansicht ---- */
   #viewerPage { display: none; width: 100%; height: 100vh; position: relative; }
   #viewerPage model-viewer { width: 100%; height: 100%; background: var(--bg); }
+  model-viewer::part(default-progress-bar) { display: none; }   /* eigene Anzeige unten */
+
   #back {
     position: absolute; top: 16px; left: 16px; z-index: 10;
     background: var(--card); color: var(--fg);
@@ -43,15 +45,38 @@
   }
   #caption .dim { color: var(--muted); }
 
+  /* ---- Ladeanzeige ---- */
+  #loader {
+    position: absolute; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    transition: opacity .35s ease;
+  }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #loaderCard {
+    width: min(360px, calc(100vw - 48px));
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 22px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.10);
+    text-align: left;
+  }
+  #loaderLabel { font-weight: 600; margin-bottom: 14px; }
+  #track { height: 6px; background: var(--track); border-radius: 999px; overflow: hidden; }
+  #fill {
+    height: 100%; width: 0%; background: var(--accent);
+    border-radius: 999px; transition: width .2s ease;
+  }
+  #loaderMeta { color: var(--muted); font-size: .85rem; margin-top: 10px; }
+  #loaderCard.failed #track { display: none; }
+  #loaderCard.failed #loaderMeta { color: #c0392b; }
+  @media (prefers-color-scheme: dark) { #loaderCard.failed #loaderMeta { color: #ff8a7a; } }
+
   /* ---- Uebersicht ---- */
   #indexPage { display: none; max-width: 1100px; margin: 0 auto; padding: 48px 24px 64px; }
   h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 0 8px; font-weight: 600; letter-spacing: -.01em; }
   .lede { color: var(--muted); margin: 0 0 8px; max-width: 62ch; }
   .hint { color: var(--muted); font-size: .85rem; margin: 0 0 32px; max-width: 62ch; }
-  .grid {
-    display: grid; gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
   .card {
     display: flex; flex-direction: column; gap: 4px;
     background: var(--card); border: 1px solid var(--line);
@@ -73,6 +98,13 @@
                 camera-controls auto-rotate shadow-intensity="1"
                 environment-image="neutral" exposure="1"></model-viewer>
   <div id="caption"></div>
+  <div id="loader">
+    <div id="loaderCard">
+      <div id="loaderLabel">wird geladen</div>
+      <div id="track"><div id="fill"></div></div>
+      <div id="loaderMeta">Verbindung wird aufgebaut</div>
+    </div>
+  </div>
 </div>
 
 <div id="indexPage">
@@ -309,27 +341,59 @@ const MODELS = [
 const params = new URLSearchParams(window.location.search);
 const requested = params.get('model');
 
-function labelFor(file) {
+function infoFor(file) {
   const hit = MODELS.find(m => m.file === file);
-  if (!hit) return { name: file.replace(/\.glb$/i, ''), masse: '' };
-  return { name: 'Skulptur ' + hit.num, masse: hit.masse };
+  if (!hit) return { name: file.replace(/\.glb$/i, ''), masse: '', mb: null };
+  return { name: 'Skulptur ' + hit.num, masse: hit.masse, mb: hit.mb };
 }
+const de = n => n.toFixed(1).replace('.', ',');
 
 if (requested) {
   const viewer = document.getElementById('viewer');
-  viewer.src = requested;
-  const { name, masse } = labelFor(requested);
-  document.title = name + ' — 3D-Galerie Arp Martinez';
+  const loader = document.getElementById('loader');
+  const card   = document.getElementById('loaderCard');
+  const fill   = document.getElementById('fill');
+  const meta   = document.getElementById('loaderMeta');
+  const info   = infoFor(requested);
+  const sizeTxt = info.mb ? de(info.mb) + ' MB' : '';
+
+  document.title = info.name + ' — 3D-Galerie Arp Martinez';
+  document.getElementById('loaderLabel').textContent = info.name + ' wird geladen';
   document.getElementById('caption').innerHTML =
-    '<strong>' + name + '</strong>' + (masse ? ' <span class="dim">' + masse + '</span>' : '');
+    '<strong>' + info.name + '</strong>' + (info.masse ? ' <span class="dim">' + info.masse + '</span>' : '');
+  if (sizeTxt) meta.textContent = sizeTxt + ' werden übertragen';
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    fill.style.width = '100%';
+    loader.classList.add('done');
+    setTimeout(() => { loader.style.display = 'none'; }, 400);
+  };
+
+  viewer.addEventListener('progress', (e) => {
+    const p = Math.max(0, Math.min(1, e.detail.totalProgress || 0));
+    fill.style.width = (p * 100).toFixed(1) + '%';
+    meta.textContent = Math.round(p * 100) + ' %' + (sizeTxt ? ' von ' + sizeTxt : '');
+    if (p >= 1) finish();
+  });
+  viewer.addEventListener('load', finish);
+  viewer.addEventListener('error', () => {
+    finished = true;
+    card.classList.add('failed');
+    document.getElementById('loaderLabel').textContent = info.name + ' konnte nicht geladen werden';
+    meta.textContent = 'Bitte die Seite neu laden. Bei anhaltendem Problem zurück zur Übersicht.';
+  });
+
+  viewer.src = requested;
   document.getElementById('viewerPage').style.display = 'block';
 } else {
-  const grid = document.getElementById('grid');
-  grid.innerHTML = MODELS.map(m =>
+  document.getElementById('grid').innerHTML = MODELS.map(m =>
     '<a class="card" href="?model=' + encodeURIComponent(m.file) + '">' +
       '<span class="name">Skulptur ' + m.num + '</span>' +
       (m.masse ? '<span class="meta">' + m.masse + '</span>' : '') +
-      '<span class="meta">' + m.mb.toFixed(1).replace('.', ',') + ' MB</span>' +
+      '<span class="meta">' + de(m.mb) + ' MB</span>' +
     '</a>'
   ).join('');
   document.getElementById('indexPage').style.display = 'block';
