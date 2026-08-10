@@ -1,44 +1,339 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Galerie Arp Martinez</title>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
-    <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #f5f5f5; }
-        model-viewer { width: 100%; height: 100%; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D-Galerie Arp Martinez</title>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f5f5; --fg: #1a1a1a; --muted: #6b6b6b;
+    --card: #ffffff; --line: #e0e0e0; --accent: #1a1a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181a; --fg: #ececec; --muted: #9aa0a6;
+      --card: #1f2225; --line: #2e3237; --accent: #ececec;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+
+  /* ---- Einzelansicht ---- */
+  #viewerPage { display: none; width: 100%; height: 100vh; position: relative; }
+  #viewerPage model-viewer { width: 100%; height: 100%; background: var(--bg); }
+  #back {
+    position: absolute; top: 16px; left: 16px; z-index: 10;
+    background: var(--card); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; font-size: 14px; text-decoration: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+  #back:hover { border-color: var(--accent); }
+  #caption {
+    position: absolute; bottom: 16px; left: 16px; z-index: 10;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 14px; font-size: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+  #caption .dim { color: var(--muted); }
+
+  /* ---- Uebersicht ---- */
+  #indexPage { display: none; max-width: 1100px; margin: 0 auto; padding: 48px 24px 64px; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 0 8px; font-weight: 600; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0 0 8px; max-width: 62ch; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 0 0 32px; max-width: 62ch; }
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+  .card {
+    display: flex; flex-direction: column; gap: 4px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px;
+    text-decoration: none; color: inherit;
+    transition: border-color .12s ease, transform .12s ease;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .card .name { font-weight: 600; }
+  .card .meta { color: var(--muted); font-size: .85rem; }
+  footer { margin-top: 40px; color: var(--muted); font-size: .8rem; max-width: 62ch; }
+</style>
 </head>
 <body>
-    <model-viewer 
-        id="viewer"
-        src="" 
-        ar 
-        ar-modes="webxr scene-viewer quick-look" 
-        camera-controls 
-        auto-rotate 
-        shadow-intensity="1"
-        environment-image="neutral" 
-        exposure="1">
-    </model-viewer>
 
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const modelName = params.get('model');
-        const viewer = document.getElementById('viewer');
+<div id="viewerPage">
+  <a id="back" href="./">&larr; Alle Skulpturen</a>
+  <model-viewer id="viewer" src="" ar ar-modes="webxr scene-viewer"
+                camera-controls auto-rotate shadow-intensity="1"
+                environment-image="neutral" exposure="1"></model-viewer>
+  <div id="caption"></div>
+</div>
 
-        if (modelName) {
-            viewer.src = modelName;
-            
-            // Automatische Zuweisung der .usdz Datei für iPhones (iOS)
-            if (modelName.toLowerCase().endsWith('.glb')) {
-                const iosModelName = modelName.slice(0, -4) + '.usdz';
-                viewer.setAttribute('ios-src', iosModelName);
-            }
-        } else {
-            document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;font-family:sans-serif;"><h1>Bitte Modell-Namen im Link angeben!</h1></div>';
-        }
-    </script>
+<div id="indexPage">
+  <h1>3D-Galerie Arp Martinez</h1>
+  <p class="lede">Fotogrammetrische Erfassung von 36 plastischen Arbeiten aus dem Nachlass
+     des Künstlers Arp Kovacs. Jedes Modell lässt sich im Browser frei drehen.</p>
+  <p class="hint">Die Modelle sind bewusst hoch aufgelöst, damit die Oberflächen erkennbar bleiben.
+     Jede Datei ist entsprechend rund 70 bis 85 MB groß, das Laden dauert je nach Verbindung
+     einen Moment.</p>
+  <div class="grid" id="grid"></div>
+  <footer>Die Zahlenpaare stammen aus den Dateinamen der Aufnahmen und sind als Maßangaben zu lesen.</footer>
+</div>
+
+<script>
+const MODELS = [
+  {
+    "file": "S1 122_70.glb",
+    "num": 1,
+    "masse": "122 × 70",
+    "mb": 70.2
+  },
+  {
+    "file": "S2 77_91.glb",
+    "num": 2,
+    "masse": "77 × 91",
+    "mb": 76.0
+  },
+  {
+    "file": "S3 39 22.glb",
+    "num": 3,
+    "masse": "39 × 22",
+    "mb": 74.1
+  },
+  {
+    "file": "S4 94 31.glb",
+    "num": 4,
+    "masse": "94 × 31",
+    "mb": 72.4
+  },
+  {
+    "file": "S5 87 43.glb",
+    "num": 5,
+    "masse": "87 × 43",
+    "mb": 73.3
+  },
+  {
+    "file": "S6 40 111.glb",
+    "num": 6,
+    "masse": "40 × 111",
+    "mb": 70.6
+  },
+  {
+    "file": "S7 143 50.glb",
+    "num": 7,
+    "masse": "143 × 50",
+    "mb": 74.2
+  },
+  {
+    "file": "S8 153 49.glb",
+    "num": 8,
+    "masse": "153 × 49",
+    "mb": 69.4
+  },
+  {
+    "file": "S9 150 75.glb",
+    "num": 9,
+    "masse": "150 × 75",
+    "mb": 71.2
+  },
+  {
+    "file": "S10 18 83.glb",
+    "num": 10,
+    "masse": "18 × 83",
+    "mb": 72.0
+  },
+  {
+    "file": "S11.glb",
+    "num": 11,
+    "masse": "",
+    "mb": 76.8
+  },
+  {
+    "file": "S12 145 78.glb",
+    "num": 12,
+    "masse": "145 × 78",
+    "mb": 73.8
+  },
+  {
+    "file": "S13 169 40.glb",
+    "num": 13,
+    "masse": "169 × 40",
+    "mb": 66.9
+  },
+  {
+    "file": "S14 148 59.glb",
+    "num": 14,
+    "masse": "148 × 59",
+    "mb": 85.6
+  },
+  {
+    "file": "S15 175 66.glb",
+    "num": 15,
+    "masse": "175 × 66",
+    "mb": 68.5
+  },
+  {
+    "file": "S16 137 91.glb",
+    "num": 16,
+    "masse": "137 × 91",
+    "mb": 74.4
+  },
+  {
+    "file": "S17 170 86.glb",
+    "num": 17,
+    "masse": "170 × 86",
+    "mb": 80.8
+  },
+  {
+    "file": "S18 152 55.glb",
+    "num": 18,
+    "masse": "152 × 55",
+    "mb": 73.8
+  },
+  {
+    "file": "S19 168 62.glb",
+    "num": 19,
+    "masse": "168 × 62",
+    "mb": 73.5
+  },
+  {
+    "file": "S20 76 90.glb",
+    "num": 20,
+    "masse": "76 × 90",
+    "mb": 80.1
+  },
+  {
+    "file": "S21 195 51.glb",
+    "num": 21,
+    "masse": "195 × 51",
+    "mb": 78.3
+  },
+  {
+    "file": "S22 152 75.glb",
+    "num": 22,
+    "masse": "152 × 75",
+    "mb": 71.1
+  },
+  {
+    "file": "S23 160 115.glb",
+    "num": 23,
+    "masse": "160 × 115",
+    "mb": 74.1
+  },
+  {
+    "file": "S24 182 70.glb",
+    "num": 24,
+    "masse": "182 × 70",
+    "mb": 79.2
+  },
+  {
+    "file": "S25  77 57.glb",
+    "num": 25,
+    "masse": "77 × 57",
+    "mb": 67.9
+  },
+  {
+    "file": "S26 14 32.glb",
+    "num": 26,
+    "masse": "14 × 32",
+    "mb": 74.5
+  },
+  {
+    "file": "S27 44 44.glb",
+    "num": 27,
+    "masse": "44 × 44",
+    "mb": 81.5
+  },
+  {
+    "file": "S28 100 50.glb",
+    "num": 28,
+    "masse": "100 × 50",
+    "mb": 76.4
+  },
+  {
+    "file": "S29 106 58.glb",
+    "num": 29,
+    "masse": "106 × 58",
+    "mb": 76.2
+  },
+  {
+    "file": "S30 134 63.glb",
+    "num": 30,
+    "masse": "134 × 63",
+    "mb": 69.5
+  },
+  {
+    "file": "S31 100 62.glb",
+    "num": 31,
+    "masse": "100 × 62",
+    "mb": 77.7
+  },
+  {
+    "file": "S32 94 70.glb",
+    "num": 32,
+    "masse": "94 × 70",
+    "mb": 82.3
+  },
+  {
+    "file": "S33 106 100.glb",
+    "num": 33,
+    "masse": "106 × 100",
+    "mb": 77.9
+  },
+  {
+    "file": "S34 225  54,5.glb",
+    "num": 34,
+    "masse": "225 × 54,5",
+    "mb": 70.8
+  },
+  {
+    "file": "S35 77 55.glb",
+    "num": 35,
+    "masse": "77 × 55",
+    "mb": 74.4
+  },
+  {
+    "file": "S36 103 105.glb",
+    "num": 36,
+    "masse": "103 × 105",
+    "mb": 75.9
+  }
+];
+
+const params = new URLSearchParams(window.location.search);
+const requested = params.get('model');
+
+function labelFor(file) {
+  const hit = MODELS.find(m => m.file === file);
+  if (!hit) return { name: file.replace(/\.glb$/i, ''), masse: '' };
+  return { name: 'Skulptur ' + hit.num, masse: hit.masse };
+}
+
+if (requested) {
+  const viewer = document.getElementById('viewer');
+  viewer.src = requested;
+  const { name, masse } = labelFor(requested);
+  document.title = name + ' — 3D-Galerie Arp Martinez';
+  document.getElementById('caption').innerHTML =
+    '<strong>' + name + '</strong>' + (masse ? ' <span class="dim">' + masse + '</span>' : '');
+  document.getElementById('viewerPage').style.display = 'block';
+} else {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = MODELS.map(m =>
+    '<a class="card" href="?model=' + encodeURIComponent(m.file) + '">' +
+      '<span class="name">Skulptur ' + m.num + '</span>' +
+      (m.masse ? '<span class="meta">' + m.masse + '</span>' : '') +
+      '<span class="meta">' + m.mb.toFixed(1).replace('.', ',') + ' MB</span>' +
+    '</a>'
+  ).join('');
+  document.getElementById('indexPage').style.display = 'block';
+}
+</script>
 </body>
 </html>
